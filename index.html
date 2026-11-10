@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Construct Scale, Oxygen Transport &amp; MSC Chondrogenesis Simulator | LTU BME 5313 / 6303</title>
+  <meta name="description" content="Interactive finite-difference reaction-diffusion oxygen transport, spatial ECM synthesis (sGAG/Collagen), and unconfined compression biomechanics simulator for MSC-seeded agarose constructs based on Buckley, Meyer &amp; Kelly (2012), Tissue Engineering Part A.">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <!-- Chart.js for interactive reaction-diffusion profiles, spatial bar charts, and structure-function regressions -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- KaTeX for crisp textbook & journal mathematics -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+  <!-- Application Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ========================================================================= -->
+  <!-- SITE HEADER: LTU Experimental Biomechanics Laboratory (EBL) Branding      -->
+  <!-- ========================================================================= -->
+  <header class="site-header">
+    <div class="brand-wrapper">
+      <img src="EBLlogo.png" alt="LTU EBL Logo" class="brand-logo" onerror="this.onerror=null; this.src='https://storage.googleapis.com/eblsquattracker/EBLlogo2.png';">
+      <div class="brand-titles">
+        <h1>LTU Cellular Mechanobiology &middot; BME 5313 / 6303</h1>
+        <p>Construct Scale, Oxygen Transport &amp; MSC Chondrogenesis Simulator (Buckley, Meyer &amp; Kelly 2012)</p>
+      </div>
+    </div>
+
+    <div class="header-nav">
+      <button class="btn btn-secondary btn-sm" id="btn-theory" title="View Buckley, Meyer &amp; Kelly (2012) Reaction-Diffusion PDE Derivation &amp; Experimental Findings">
+        <span>&#128214; Theory &amp; PDE Derivation</span>
+      </button>
+      <button class="btn btn-secondary btn-sm" id="btn-quiz" title="Test your understanding with BME 5313 / 6303 practice questions">
+        <span>&#9997;&#65039; Practice Quiz</span>
+      </button>
+      <button class="btn btn-secondary btn-sm" id="btn-export-csv" title="Export current construct PDE profiles, subregion biochemistry, and moduli to CSV">
+        <span>&#128229; Export CSV</span>
+      </button>
+      <button class="btn btn-primary btn-sm" id="btn-reset" title="Reset simulator to baseline Ø5×3.0 mm construct at 20% O₂ (Day 42)">
+        <span>&#8634; Reset</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- MODE NAVIGATION BAR (4 Pedagogical Tabs)                                  -->
+  <!-- ========================================================================= -->
+  <nav class="mode-navigation-bar">
+    <button class="nav-tab-btn active" data-mode="oxygen" id="tab-btn-oxygen">
+      <span>1. O&#8322; Reaction&ndash;Diffusion PDE</span>
+      <span class="nav-tab-badge">Figs. 1&ndash;3 COMSOL</span>
+    </button>
+    <button class="nav-tab-btn" data-mode="spatial" id="tab-btn-spatial">
+      <span>2. Spatial ECM &amp; Subregions</span>
+      <span class="nav-tab-badge">Figs. 4&ndash;6 &amp; Table 1</span>
+    </button>
+    <button class="nav-tab-btn" data-mode="mechanics" id="tab-btn-mechanics">
+      <span>3. Biomechanics &amp; Structure&ndash;Function</span>
+      <span class="nav-tab-badge">Fig. 7 Moduli</span>
+    </button>
+    <button class="nav-tab-btn" data-mode="differentiation" id="tab-btn-differentiation">
+      <span>4. MSC &rarr; Chondrocyte Maturation</span>
+      <span class="nav-tab-badge">42-Day Time-Lapse</span>
+    </button>
+  </nav>
+
+  <!-- ========================================================================= -->
+  <!-- MAIN 2-COLUMN APPLICATION GRID                                            -->
+  <!-- ========================================================================= -->
+  <main class="app-container">
+
+    <!-- ======================================================================= -->
+    <!-- LEFT COLUMN: Axisymmetric Hydrogel Visualizer, Toolbar & 6-Card Metrics -->
+    <!-- ======================================================================= -->
+    <section class="panel-card panel-visualizer">
+      <div class="panel-header">
+        <div class="panel-header-titles">
+          <h2 id="canvas-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            Axisymmetric Hydrogel Construct &amp; Spatial Microenvironment
+          </h2>
+          <span class="panel-subtitle" id="canvas-subtitle">3D cylindrical wireframe + \(r\text{–}z\) cross-section &middot; Hover construct to probe local \(C_{\text{ox}}\), sGAG, Collagen &amp; phenotype</span>
+        </div>
+
+        <div class="view-presets-bar" id="field-selector-bar">
+          <button class="btn-view-pill field-pill active" data-field="o2" id="btn-field-o2" title="COMSOL-style O₂ concentration heatmap (%)">O&#8322; Tension (%)</button>
+          <button class="btn-view-pill field-pill" data-field="sgag" id="btn-field-sgag" title="Alcian Blue sulfated glycosaminoglycan (sGAG % w/w) histology">sGAG (Alcian Blue)</button>
+          <button class="btn-view-pill field-pill" data-field="collagen" id="btn-field-collagen" title="Picrosirius Red total collagen (% w/w) histology">Collagen (Picrosirius Red)</button>
+          <button class="btn-view-pill field-pill" data-field="cells" id="btn-field-cells" title="MSC vs. Differentiated Chondrocyte spatial distribution &amp; viable DNA">MSC &rarr; Chondrocyte &amp; DNA</button>
+        </div>
+      </div>
+
+      <div class="panel-body">
+        <!-- Overlay & Time-Lapse Toolbar -->
+        <div class="canvas-overlay-toggles">
+          <label class="overlay-chk-label" title="Overlay Top/Bottom Annulus &amp; Core (TA, BA, TC, BC) coring boundaries (Fig. 6D)">
+            <input type="checkbox" id="toggle-subregions" checked>
+            <span>Subregion Grid (TA/BA/TC/BC)</span>
+          </label>
+          <label class="overlay-chk-label" title="Display iso-concentration contours, diffusive O₂ flux vectors, and dish BC">
+            <input type="checkbox" id="toggle-contours" checked>
+            <span>Iso-Contours &amp; Flux</span>
+          </label>
+          <label class="overlay-chk-label" title="Overlay discrete cell morphologies (spindle MSCs vs. rounded chondrocytes in lacunae)">
+            <input type="checkbox" id="toggle-cells" checked>
+            <span>Cell Morphology (MSC / Chondrocyte)</span>
+          </label>
+
+          <div class="overlay-select-group" title="Select O₂ colorbar normalization range">
+            <label for="select-o2-scale">Scale:</label>
+            <select id="select-o2-scale" class="toolbar-select">
+              <option value="auto" selected>Auto Scale</option>
+              <option value="20">0&ndash;20% O&#8322; (Normoxic)</option>
+              <option value="5">0&ndash;5% O&#8322; (Hypoxic)</option>
+            </select>
+          </div>
+
+          <button class="btn-timelapse" id="btn-play-timelapse" title="Animate 42-day chondrogenic differentiation and ECM accumulation">
+            <span>&#9654; Play 42d Culture</span>
+          </button>
+        </div>
+
+        <!-- 2D/3D Axisymmetric Canvas Container -->
+        <div class="canvas-container" id="canvas-wrapper">
+          <canvas id="sim-canvas"></canvas>
+
+          <!-- Top-Left Field & Boundary Legend Pill -->
+          <div class="canvas-legend-pill" id="canvas-mode-pill">
+            <span class="legend-item"><span class="legend-swatch" style="background:linear-gradient(90deg,#1d4ed8,#10b981,#eab308,#ef4444);"></span>O&#8322; Tension \(C_{\text{ox}}(r,z)\)</span>
+            <span class="legend-item" style="color:var(--color-text-muted);">Top/Side: \(C_{\text{ext}}\) &middot; Bottom \(z=0\): \(\partial C/\partial z = 0\) (Impermeable Dish)</span>
+          </div>
+
+          <!-- Top-Right Floating Zoom Controls -->
+          <div class="canvas-floating-controls">
+            <button class="canvas-floating-btn" id="btn-zoom-in" title="Zoom In">+</button>
+            <button class="canvas-floating-btn" id="btn-zoom-out" title="Zoom Out">&minus;</button>
+            <button class="canvas-floating-btn" id="btn-view-reset" title="Reset Construct Viewport">&#10530;</button>
+          </div>
+
+          <!-- Bottom-Left Live Hover Probe & Construct HUD Overlay -->
+          <div class="canvas-hud-overlay" id="canvas-hud">
+            <span id="hud-scale">&Oslash;5.0 &times; 3.00 mm &middot; 20.0% O&#8322; &middot; Day 42</span>
+            <span id="hud-core-o2">Core O&#8322;(0,0): 16.3%</span>
+            <span id="hud-chondro">Chondro: 68.4%</span>
+            <span class="hud-badge-eq" id="hud-probe">Hover cross-section to probe (r, z)</span>
+          </div>
+        </div>
+
+        <!-- 6-Card Live Metrics Ribbon -->
+        <div class="metrics-ribbon">
+          <div class="metric-pill">
+            <span class="metric-label">1. Bottom Core O&#8322;</span>
+            <span class="metric-value" id="metric-core-o2">16.3%</span>
+            <span class="metric-sub" id="metric-core-o2-sub">Global Min at (r=0, z=0)</span>
+          </div>
+          <div class="metric-pill">
+            <span class="metric-label">2. Differentiated Chondrocytes</span>
+            <span class="metric-value" id="metric-chondro-pct">68.4%</span>
+            <span class="metric-sub" id="metric-chondro-pct-sub">vs. 31.6% Undiff. MSC</span>
+          </div>
+          <div class="metric-pill">
+            <span class="metric-label">3. Total Viable DNA</span>
+            <span class="metric-value" id="metric-dna">64.8 ng/mg</span>
+            <span class="metric-sub" id="metric-dna-sub">Cell Viability Retention</span>
+          </div>
+          <div class="metric-pill">
+            <span class="metric-label">4. Total sGAG Content</span>
+            <span class="metric-value" id="metric-sgag">0.51% w/w</span>
+            <span class="metric-sub" id="metric-sgag-sub">79.5 &micro;g/&micro;g DNA</span>
+          </div>
+          <div class="metric-pill">
+            <span class="metric-label">5. Total Collagen Content</span>
+            <span class="metric-value" id="metric-collagen">0.56% w/w</span>
+            <span class="metric-sub" id="metric-collagen-sub">87.0 &micro;g/&micro;g DNA</span>
+          </div>
+          <div class="metric-pill highlight">
+            <span class="metric-label">6. Dynamic / Eq. Modulus</span>
+            <span class="metric-value" id="metric-moduli">163.0 / 23.2 kPa</span>
+            <span class="metric-sub" id="metric-moduli-sub">1 Hz Dynamic &amp; Stress-Relax</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- RIGHT COLUMN: Presets, Sliders & Mode-Specific Analytical Panels        -->
+    <!-- ======================================================================= -->
+    <section class="panel-card panel-controls">
+      <div class="panel-header">
+        <div class="panel-header-titles">
+          <h2>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Construct Scale, Microenvironment Controls &amp; Quantitative Analysis
+          </h2>
+          <span class="panel-subtitle">2D Axisymmetric Michaelis&ndash;Menten PDE Solver &amp; Subregion Biomechanics Explorer</span>
+        </div>
+      </div>
+
+      <div class="panel-body">
+
+        <!-- SHARED PARAMETER CONTROLS: 8 PRESETS + 8 SLIDERS -->
+        <div class="controls-shared-box">
+          <div class="section-label">
+            <span>Curated Experimental Conditions (Buckley, Meyer &amp; Kelly 2012)</span>
+            <span style="font-weight:500; text-transform:none;">Click any scale or oxygen preset</span>
+          </div>
+
+          <!-- 8 Curated Preset Buttons -->
+          <div class="preset-button-grid" id="preset-grid">
+            <button class="btn-preset" data-preset="scale_4x15" data-diameter="4.0" data-height="1.5" data-o2="20.0" data-density="15.0" data-chondro="0" data-vmax="1.0" data-agarose="2.0" data-day="42">
+              <strong>1. &Oslash;4&times;1.5 (20% O&#8322;)</strong>
+              <span>Smallest scale &middot; Core 18.2% O&#8322;, E_dyn 90.8 kPa</span>
+            </button>
+            <button class="btn-preset active" data-preset="scale_5x30" data-diameter="5.0" data-height="3.0" data-o2="20.0" data-density="15.0" data-chondro="0" data-vmax="1.0" data-agarose="2.0" data-day="42">
+              <strong>2. &Oslash;5&times;3.0 (20% O&#8322;)</strong>
+              <span>Standard scale &middot; Core 16.3% O&#8322;, E_dyn 163 kPa</span>
+            </button>
+            <button class="btn-preset" data-preset="scale_6x45" data-diameter="6.0" data-height="4.5" data-o2="20.0" data-density="15.0" data-chondro="0" data-vmax="1.0" data-agarose="2.0" data-day="42">
+              <strong>3. &Oslash;6&times;4.5 (20% O&#8322;)</strong>
+              <span>Intermediate scale &middot; Core 14.3% O&#8322;, E_dyn 215 kPa</span>
+            </button>
+            <button class="btn-preset" data-preset="scale_8x45" data-diameter="8.0" data-height="4.5" data-o2="20.0" data-density="15.0" data-chondro="0" data-vmax="1.0" data-agarose="2.0" data-day="42">
+              <strong>4. &Oslash;8&times;4.5 (20% O&#8322;)</strong>
+              <span>Largest scale &middot; Core 10.8% O&#8322;, E_dyn 327.5 kPa</span>
+            </button>
+            <button class="btn-preset" data-preset="hypoxic_5x30" data-diameter="5.0" data-height="3.0" data-o2="5.0" data-density="15.0" data-chondro="0" data-vmax="1.0" data-agarose="2.0" data-day="42">
+              <strong>5. &Oslash;5&times;3.0 @ 5% O&#8322;</strong>
+              <span>Hypoxic boost &middot; Core 1.9% O&#8322;, 1.9&times; E_dyn (310 kPa)</span>
+            </button>
+            <button class="btn-preset" data-preset="hypoxic_6x45" data-diameter="6.0" data-height="4.5" data-o2="5.0" data-density="15.0" data-chondro="0" data-vmax="1.0" data-agarose="2.0" data-day="42">
+              <strong>6. &Oslash;6&times;4.5 @ 5% O&#8322;</strong>
+              <span>Core hypoxia (0.7% O&#8322;) &middot; &downarrow;DNA &amp; &downarrow;Col (0.69%)</span>
+            </button>
+            <button class="btn-preset" data-preset="high_vmax" data-diameter="8.0" data-height="4.5" data-o2="20.0" data-density="15.0" data-chondro="0" data-vmax="2.0" data-agarose="2.0" data-day="42">
+              <strong>7. 2&times; Vmax (37.4 fmol/h)</strong>
+              <span>Undiff. MSC uptake &middot; Core 2.6% O&#8322; (Fig. 2E)</span>
+            </button>
+            <button class="btn-preset" data-preset="chondrocytes_100" data-diameter="8.0" data-height="4.5" data-o2="20.0" data-density="15.0" data-chondro="100" data-vmax="1.0" data-agarose="2.0" data-day="42">
+              <strong>8. 100% Chondrocytes</strong>
+              <span>Mature phenotype &middot; Peripheral ECM synthesis</span>
+            </button>
+          </div>
+
+          <!-- 8 Interactive Parameter Sliders -->
+          <div class="sliders-grid">
+            <!-- 1. Construct Diameter -->
+            <div class="slider-control-card">
+              <div class="control-row">
+                <label for="slider-diameter">Construct Diameter (\(\varnothing\)):</label>
+                <span class="badge-value" id="val-diameter">5.0 mm</span>
+              </div>
+              <input type="range" id="slider-diameter" min="2.0" max="10.0" step="0.5" value="5.0" class="range-slider">
+              <div class="slider-hint">
+                <span>2.0 mm</span>
+                <span>Paper: 4, 5, 6, 8 mm</span>
+                <span>10.0 mm</span>
+              </div>
+            </div>
+
+            <!-- 2. Construct Height -->
+            <div class="slider-control-card">
+              <div class="control-row">
+                <label for="slider-height">Construct Height (\(H\)):</label>
+                <span class="badge-value" id="val-height">3.00 mm</span>
+              </div>
+              <input type="range" id="slider-height" min="1.0" max="6.0" step="0.25" value="3.0" class="range-slider">
+              <div class="slider-hint">
+                <span>1.0 mm</span>
+                <span>Paper: 1.5, 3.0, 4.5 mm</span>
+                <span>6.0 mm</span>
+              </div>
+            </div>
+
+            <!-- 3. External Oxygen -->
+            <div class="slider-control-card">
+              <div class="control-row">
+                <label for="slider-o2">External Oxygen (\(C_{\text{ext}}\)):</label>
+                <span class="badge-value" id="val-o2">20.0%</span>
+              </div>
+              <input type="range" id="slider-o2" min="1.0" max="21.0" step="0.5" value="20.0" class="range-slider">
+              <div class="slider-hint">
+                <span>1% (Severe)</span>
+                <span>5% (Hypoxic)</span>
+                <span>20% (Normoxic)</span>
+              </div>
+            </div>
+
+            <!-- 4. Initial Cell Density -->
+            <div class="slider-control-card">
+              <div class="control-row">
+                <label for="slider-cell-density">Initial Cell Density (\(n_{\text{cell}}\)):</label>
+                <span class="badge-value" id="val-cell-density">15.0 M/mL</span>
+              </div>
+              <input type="range" id="slider-cell-density" min="1.0" max="30.0" step="1.0" value="15.0" class="range-slider">
+              <div class="slider-hint">
+                <span>1 M/mL</span>
+                <span>Paper: 15 &times; 10&#8310; cells/mL</span>
+                <span>30 M/mL</span>
+              </div>
+            </div>
+
+            <!-- 5. Initial Cell Phenotype -->
+            <div class="slider-control-card">
+              <div class="control-row">
+                <label for="slider-chondro-pct">Initial Cell Phenotype:</label>
+                <span class="badge-value" id="val-chondro-pct">0% Chondro (100% MSC)</span>
+              </div>
+              <input type="range" id="slider-chondro-pct" min="0" max="100" step="5" value="0" class="range-slider">
+              <div class="slider-hint">
+                <span>0% (100% MSC)</span>
+                <span>Co-Culture Mix</span>
+                <span>100% Chondrocyte</span>
+              </div>
+            </div>
+
+            <!-- 6. O2 Consumption Rate Vmax -->
+            <div class="slider-control-card">
+              <div class="control-row">
+                <label for="slider-vmax">O&#8322; Consumption Rate (\(V_{\max}\)):</label>
+                <span class="badge-value" id="val-vmax">1.0&times; (18.7 fmol/h/cell)</span>
+              </div>
+              <input type="range" id="slider-vmax" min="0.5" max="2.5" step="0.1" value="1.0" class="range-slider">
+              <div class="slider-hint">
+                <span>0.5&times; (9.4)</span>
+                <span>1.0&times; (18.7) &middot; 2.0&times; (37.4)</span>
+                <span>2.5&times; (46.8)</span>
+              </div>
+            </div>
+
+            <!-- 7. Agarose Hydrogel Conc -->
+            <div class="slider-control-card">
+              <div class="control-row">
+                <label for="slider-agarose">Agarose Hydrogel Conc.:</label>
+                <span class="badge-value" id="val-agarose">2.0% (D = 2.77e-9 m&sup2;/s)</span>
+              </div>
+              <input type="range" id="slider-agarose" min="1.0" max="4.0" step="0.5" value="2.0" class="range-slider">
+              <div class="slider-hint">
+                <span>1.0% w/v</span>
+                <span>Mackie&ndash;Meares Eq. (2)</span>
+                <span>4.0% w/v</span>
+              </div>
+            </div>
+
+            <!-- 8. Culture Duration (Time) -->
+            <div class="slider-control-card">
+              <div class="control-row">
+                <label for="slider-day">Culture Duration (Time):</label>
+                <span class="badge-value" id="val-day">Day 42</span>
+              </div>
+              <input type="range" id="slider-day" min="0" max="42" step="1" value="42" class="range-slider">
+              <div class="slider-hint">
+                <span>Day 0 (Seeding)</span>
+                <span>TGF-&beta;3 Culture</span>
+                <span>Day 42 (Endpoint)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- MODE 1 PANEL: O2 REACTION-DIFFUSION PDE (Figs. 1-3 COMSOL)        -->
+        <!-- ================================================================= -->
+        <div class="mode-panel" id="panel-oxygen">
+          <div class="section-label">
+            <span>Steady-State Axisymmetric Reaction&ndash;Diffusion Verification (Eqs. 1&ndash;3)</span>
+            <span style="font-family:var(--font-mono); color:var(--color-primary-dark);" id="pde-convergence-tag">Finite-Difference Grid Converged &check;</span>
+          </div>
+
+          <!-- PDE Verification Strip -->
+          <div class="pde-metrics-strip" id="pde-verification-strip">
+            <div class="pde-stat-box">
+              <span class="pde-stat-label">Mackie&ndash;Meares \(D_{\text{construct}}\)</span>
+              <span class="pde-stat-val" id="pde-diffusivity">2.77 &times; 10&#8315;&#8313; m&sup2;/s</span>
+              <span class="pde-stat-sub" id="pde-diffusivity-sub">&phi;_f = 0.020 &middot; 92.4% of D_H2O</span>
+            </div>
+            <div class="pde-stat-box">
+              <span class="pde-stat-label">Max O&#8322; Sink \(n_{\text{cell}} V_{\max}\)</span>
+              <span class="pde-stat-val" id="pde-vmax-sink">7.79 &times; 10&#8315;&#8309; mol/m&sup3;&middot;s</span>
+              <span class="pde-stat-sub" id="pde-vmax-sink-sub">K_m = 6.3 &times; 10&#8315;&sup3; mol/m&sup3; (0.64% O&#8322;)</span>
+            </div>
+            <div class="pde-stat-box">
+              <span class="pde-stat-label">Thiele Modulus \(\Phi^2\)</span>
+              <span class="pde-stat-val" id="pde-thiele">&Phi;&sup2; = 0.90</span>
+              <span class="pde-stat-sub" id="pde-thiele-sub">R&sup2; n V_max / (D C_ext)</span>
+            </div>
+            <div class="pde-stat-box">
+              <span class="pde-stat-label">Bottom Core \(C_{\text{ox}}(0,0)\)</span>
+              <span class="pde-stat-val" id="pde-core-o2">16.3% O&#8322;</span>
+              <span class="pde-stat-sub" id="pde-core-o2-sub">&Delta;O&#8322; = &minus;3.7% vs. C_ext</span>
+            </div>
+          </div>
+
+          <!-- Two Chart.js Canvases: Centerline & Radial Profiles -->
+          <div class="charts-dual-grid">
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <div>
+                  <div class="chart-card-title">Centerline Axial O&#8322; Profile (\(r = 0\), Depth \(z_{\text{depth}} \in [0, H]\))</div>
+                  <div class="chart-card-subtitle">Figs. 2C/E &amp; 3C/E: Top exposed surface (\(0\)) to impermeable dish base (\(H\)) across all 4 scales</div>
+                </div>
+              </div>
+              <div class="chart-container-wrapper">
+                <canvas id="chart-o2-centerline"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <div>
+                  <div class="chart-card-title">Mid-Height Radial O&#8322; Profile (\(z = H/2\), Depth \(d_r = R - r\))</div>
+                  <div class="chart-card-subtitle">Figs. 2D/F &amp; 3D/F: Outer lateral surface (\(d_r = 0\)) to construct center (\(d_r = R\))</div>
+                </div>
+              </div>
+              <div class="chart-container-wrapper">
+                <canvas id="chart-o2-radial"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Theory Callout Box for Eqs. 1-3 -->
+          <div class="theory-callout">
+            <strong>Axisymmetric Reaction&ndash;Diffusion &amp; Impermeable Dish Effect (Eqs. 1&ndash;3, Figs. 1&ndash;3):</strong>
+            Oxygen transport at steady state balances Fickian diffusion with nonlinear Michaelis&ndash;Menten cellular uptake:
+            \(\nabla \cdot (D_{\text{construct}} \nabla C_{\text{ox}}) = \frac{n_{\text{cell}} V_{\max} C_{\text{ox}}}{K_m + C_{\text{ox}}}\), where \(D_{\text{construct}} = D_{\text{H}_2\text{O}}\frac{(1-\phi_f)^2}{(1+\phi_f)^2}\). Because the construct rests on an impermeable tissue culture plastic well base (\(\partial C_{\text{ox}}/\partial z = 0\) at \(z=0\)), the global oxygen minimum always occurs at the <strong>Bottom Core (\(r=0, z=0\))</strong>: \(18.2\%\) (\(\varnothing 4\times 1.5\text{ mm}\)), \(16.3\%\) (\(\varnothing 5\times 3.0\text{ mm}\)), \(14.3\%\) (\(\varnothing 6\times 4.5\text{ mm}\)), and \(10.8\%\text{ O}_2\) (\(\varnothing 8\times 4.5\text{ mm}\)) at \(20\%\text{ O}_2\). Doubling \(V_{\max}\) from \(18.7\) to \(37.4\text{ fmol/h/cell}\) drops the \(\varnothing 8\times 4.5\text{ mm}\) bottom core from \(10.8\%\) to \(2.6\%\text{ O}_2\) at \(20\%\text{ O}_2\), and drops the \(\varnothing 5\times 3.0\text{ mm}\) bottom core at \(5\%\text{ O}_2\) from \(1.9\%\) to \(0.26\%\text{ O}_2\) (with anoxia in larger constructs).
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- MODE 2 PANEL: SPATIAL ECM & SUBREGIONS (Figs. 4-6 & Table 1)      -->
+        <!-- ================================================================= -->
+        <div class="mode-panel" id="panel-spatial" style="display:none;">
+          <div class="section-label">
+            <span>Spatial Subregion Biochemical Assay &amp; Table 1 Experimental Benchmark</span>
+            <span style="font-family:var(--font-mono); color:var(--color-primary-dark);" id="spatial-benchmark-tag">Top/Bottom Annulus &amp; Core (TA, BA, TC, BC)</span>
+          </div>
+
+          <!-- Complete Subregion Quantitative Table -->
+          <div class="table-wrapper">
+            <table class="data-table" id="table-subregions">
+              <thead>
+                <tr>
+                  <th>Subregion</th>
+                  <th>Local O&#8322; (%)</th>
+                  <th>Chondro (%)</th>
+                  <th>DNA (ng/mg)</th>
+                  <th>sGAG (% w/w)</th>
+                  <th>sGAG/DNA (&micro;g/&micro;g)</th>
+                  <th>Collagen (% w/w)</th>
+                  <th>Col/DNA (&micro;g/&micro;g)</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-subregions">
+                <tr>
+                  <td><span class="subregion-tag"><span class="subregion-dot" style="background:#0284c7;"></span>Top Annulus (TA)</span></td>
+                  <td>18.9%</td>
+                  <td>64.2%</td>
+                  <td>73.04</td>
+                  <td>0.21%</td>
+                  <td>28.92</td>
+                  <td>0.23%</td>
+                  <td>31.76</td>
+                </tr>
+                <tr>
+                  <td><span class="subregion-tag"><span class="subregion-dot" style="background:#0d9488;"></span>Bottom Annulus (BA)</span></td>
+                  <td>17.8%</td>
+                  <td>67.5%</td>
+                  <td>71.76</td>
+                  <td>0.31%</td>
+                  <td>43.62</td>
+                  <td>0.43%</td>
+                  <td>61.10</td>
+                </tr>
+                <tr>
+                  <td><span class="subregion-tag"><span class="subregion-dot" style="background:#7c3aed;"></span>Top Core (TC)</span></td>
+                  <td>17.4%</td>
+                  <td>69.8%</td>
+                  <td>57.87</td>
+                  <td>0.58%</td>
+                  <td>100.33</td>
+                  <td>0.77%</td>
+                  <td>132.62</td>
+                </tr>
+                <tr>
+                  <td><span class="subregion-tag"><span class="subregion-dot" style="background:#dc2626;"></span>Bottom Core (BC)</span></td>
+                  <td>16.3%</td>
+                  <td>73.1%</td>
+                  <td>48.53</td>
+                  <td>1.07%</td>
+                  <td>223.56</td>
+                  <td>1.00%</td>
+                  <td>208.30</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Two Chart.js Canvases: Subregion Bar Chart (Fig. 6) & Multi-Scale Comparison (Fig. 5) -->
+          <div class="charts-dual-grid">
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <div>
+                  <div class="chart-card-title">Subregion Spatial Distribution: TA, BA, TC, BC (Fig. 6A&ndash;C &amp; Table 1)</div>
+                  <div class="chart-card-subtitle">Comparing regional DNA, sGAG (% w/w), and Collagen (% w/w) across cored construct zones</div>
+                </div>
+              </div>
+              <div class="chart-container-wrapper">
+                <canvas id="chart-spatial-regions"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <div>
+                  <div class="chart-card-title">Multi-Scale Biochemical Synthesis at 20% vs. 5% O&#8322; (Fig. 5A&ndash;F)</div>
+                  <div class="chart-card-subtitle">Construct scales \(\varnothing 4\times 1.5\), \(\varnothing 5\times 3\), \(\varnothing 6\times 4.5\), \(\varnothing 8\times 4.5\text{ mm}\)</div>
+                </div>
+              </div>
+              <div class="chart-container-wrapper">
+                <canvas id="chart-scale-biochem"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Theory Callout Box for Spatial Divergence -->
+          <div class="theory-callout">
+            <strong>Paradoxical Spatial Divergence of sGAG vs. Collagen in MSC Constructs (Figs. 4, 6 &amp; Table 1):</strong>
+            Unlike mature chondrocyte constructs where both sGAG and collagen concentrate at the well-oxygenated periphery, MSC-seeded large constructs (\(\varnothing 8\times 4.5\text{ mm}\) at \(20\%\text{ O}_2\)) exhibit <strong>opposing spatial gradients</strong>: <strong>sGAG peaks in the hypoxic core</strong> (\(\text{TC } 1.18 \pm 0.06\%\), \(\text{BC } 1.19 \pm 0.01\%\text{ w/w}\) vs. \(\text{TA } 0.62 \pm 0.01\%\), \(\text{BA } 0.88 \pm 0.11\%\text{ w/w}\)) because moderate self-induced hypoxia (\(\sim 10.8\%\text{ O}_2\) at \(1\times V_{\max}\), \(\sim 2.6\%\text{ O}_2\) at \(2\times V_{\max}\)) stabilizes HIF-1\(\alpha\) and accelerates SOX9-mediated MSC chondrogenesis; conversely, <strong>Collagen peaks in the normoxic outer annulus</strong> (\(\text{TA } 2.79 \pm 0.74\%\), \(\text{BA } 2.89 \pm 0.71\%\text{ w/w}\) vs. \(\text{TC } 0.74 \pm 0.13\%\), \(\text{BC } 0.46 \pm 0.18\%\text{ w/w}\)) because prolyl-4-hydroxylase requires molecular \(\text{O}_2\) for triple-helical collagen hydroxylation and cross-linking.
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- MODE 3 PANEL: BIOMECHANICS & STRUCTURE-FUNCTION (Fig. 7 Moduli)   -->
+        <!-- ================================================================= -->
+        <div class="mode-panel" id="panel-mechanics" style="display:none;">
+          <div class="section-label">
+            <span>Unconfined Compression Mechanical Testing &amp; Structure&ndash;Function Correlations (Fig. 7)</span>
+            <span style="font-family:var(--font-mono); color:var(--color-primary-dark);">10% Ramp Stress-Relax + 1% 1 Hz Dynamic</span>
+          </div>
+
+          <!-- Unconfined Compression Mechanical Testing Summary Strip -->
+          <div class="pde-metrics-strip" id="mechanics-summary-strip">
+            <div class="pde-stat-box">
+              <span class="pde-stat-label">Equilibrium Modulus \(E_{\text{eq}}\)</span>
+              <span class="pde-stat-val" id="mech-val-eeq">23.2 kPa</span>
+              <span class="pde-stat-sub" id="mech-val-eeq-sub">10% Strain, 30 min Relax</span>
+            </div>
+            <div class="pde-stat-box">
+              <span class="pde-stat-label">Dynamic Modulus \(E_{\text{dyn}}\)</span>
+              <span class="pde-stat-val" id="mech-val-edyn">163.0 kPa</span>
+              <span class="pde-stat-sub" id="mech-val-edyn-sub">1% Cyclic Strain @ 1 Hz</span>
+            </div>
+            <div class="pde-stat-box">
+              <span class="pde-stat-label">Bulk Matrix (sGAG + Col)</span>
+              <span class="pde-stat-val" id="mech-val-matrix">0.51% + 0.56% w/w</span>
+              <span class="pde-stat-sub" id="mech-val-matrix-sub">Proteoglycan + Fibrillar Net</span>
+            </div>
+            <div class="pde-stat-box">
+              <span class="pde-stat-label">Spatial Homogeneity \(\eta\)</span>
+              <span class="pde-stat-val" id="mech-val-homogeneity">&eta; = 0.91</span>
+              <span class="pde-stat-sub" id="mech-val-homogeneity-sub">Load-transfer efficiency</span>
+            </div>
+          </div>
+
+          <!-- Two Chart.js Canvases: Moduli Across Scales (Fig. 7A-C) & Structure-Function Scatter (Fig. 7D-G) -->
+          <div class="charts-dual-grid">
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <div>
+                  <div class="chart-card-title">Equilibrium (\(E_{\text{eq}}\)) &amp; Dynamic (\(E_{\text{dyn}}\)) Moduli vs. Scale (Fig. 7A&ndash;C)</div>
+                  <div class="chart-card-subtitle">Comparing \(\varnothing 4\times 1.5\), \(\varnothing 5\times 3\), \(\varnothing 6\times 4.5\), \(\varnothing 8\times 4.5\text{ mm}\) at 20% and 5% O&#8322;</div>
+                </div>
+              </div>
+              <div class="chart-container-wrapper">
+                <canvas id="chart-moduli-scale"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <div>
+                  <div class="chart-card-title">Structure&ndash;Function Regression Plot (Fig. 7D&ndash;G)</div>
+                  <div class="chart-card-subtitle" id="sf-plot-subtitle">20% O&#8322; (\(\circ\)), 5% O&#8322; (\(\times\)), linear fit \(r^2\), and active construct (\(\star\))</div>
+                </div>
+                <div class="sf-selector-bar" id="sf-selector-bar">
+                  <button class="btn-sf-pill active" data-sf="edyn_sgag" title="Fig. 7D: Dynamic Modulus vs. Total sGAG (% w/w), r² = 0.61">E_dyn vs. sGAG</button>
+                  <button class="btn-sf-pill" data-sf="edyn_col" title="Fig. 7E: Dynamic Modulus vs. Total Collagen (% w/w), r² = 0.65">E_dyn vs. Col</button>
+                  <button class="btn-sf-pill" data-sf="eeq_sgag" title="Fig. 7F: Equilibrium Modulus vs. Total sGAG (% w/w), r² = 0.65">E_eq vs. sGAG</button>
+                  <button class="btn-sf-pill" data-sf="eeq_col" title="Fig. 7G: Equilibrium Modulus vs. Total Collagen (% w/w), r² = 0.72">E_eq vs. Col</button>
+                </div>
+              </div>
+              <div class="chart-container-wrapper">
+                <canvas id="chart-structure-function"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Theory Callout Box for Biomechanics -->
+          <div class="theory-callout">
+            <strong>Scale-Dependent Stiffness &amp; Hypoxic Modulation (Fig. 7A&ndash;G):</strong>
+            At \(20\%\text{ O}_2\), increasing construct scale from \(\varnothing 4\times 1.5\text{ mm}\) (\(\text{Core O}_2 = 18.2\%\)) to \(\varnothing 8\times 4.5\text{ mm}\) (\(\text{Core O}_2 = 10.8\%\)) deepens self-induced physiological hypoxia, promoting MSC chondrogenesis and increasing bulk sGAG (\(0.14\% \to 0.88\%\text{ w/w}\)), collagen (\(0.31\% \to 1.62\%\text{ w/w}\)), equilibrium modulus \(E_{\text{eq}}\) (\(23.5 \to 36.52\text{ kPa}\)), and dynamic modulus \(E_{\text{dyn}}\) (\(90.81 \to 327.51\text{ kPa}\)). Culturing \(\varnothing 5\times 3.0\text{ mm}\) constructs at \(5\%\text{ O}_2\) (\(\text{Core O}_2 = 1.9\%\)) boosts sGAG (\(0.51\% \to 1.16\%\text{ w/w}\)), collagen (\(0.56\% \to 2.22\%\text{ w/w}\)), \(E_{\text{eq}}\) (\(23.2 \to 33.0\text{ kPa}\)), and increases \(E_{\text{dyn}}\) by <strong>1.9-fold</strong> (\(163.0 \to 310.0\text{ kPa}\)); however, scaling up to \(\varnothing 6\times 4.5\text{ mm}\) at \(5\%\text{ O}_2\) (\(\text{Core O}_2 = 0.7\%\)) causes core cell loss (\(\text{DNA: } 62.50 \to 51.80\text{ ng/mg}\)) and suppresses collagen accumulation (\(2.22\% \to 0.69\%\text{ w/w}\)).
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- MODE 4 PANEL: MSC -> CHONDROCYTE MATURATION (42-Day Time-Lapse)   -->
+        <!-- ================================================================= -->
+        <div class="mode-panel" id="panel-differentiation" style="display:none;">
+          <div class="section-label">
+            <span>MSC Chondrogenic Lineage Commitment, Metabolic Shift &amp; Phenotype Comparison</span>
+            <span style="font-family:var(--font-mono); color:var(--color-primary-dark);" id="diff-day-tag">Day 42 Endpoint</span>
+          </div>
+
+          <!-- Cell Phenotype & Metabolic Summary Table -->
+          <div class="table-wrapper">
+            <table class="data-table" id="table-differentiation">
+              <thead>
+                <tr>
+                  <th>Cell Population / Scale</th>
+                  <th>O&#8322; Uptake \(V_{\max}\)</th>
+                  <th>Bottom Core O&#8322;</th>
+                  <th>Chondro Fraction</th>
+                  <th>sGAG Gradient (Core/Ann)</th>
+                  <th>Col Gradient (Core/Ann)</th>
+                  <th>Dynamic Mod. \(E_{\text{dyn}}\)</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-differentiation">
+                <tr>
+                  <td><strong>Current Construct (Active)</strong></td>
+                  <td id="diff-curr-vmax">18.7 fmol/h/cell</td>
+                  <td id="diff-curr-core">16.3%</td>
+                  <td id="diff-curr-chondro">68.4%</td>
+                  <td id="diff-curr-sgag-ratio">1.22&times; (Core High)</td>
+                  <td id="diff-curr-col-ratio">0.78&times; (Annulus High)</td>
+                  <td id="diff-curr-edyn">163.0 kPa</td>
+                </tr>
+                <tr>
+                  <td><strong>MSC-Seeded &Oslash;8&times;4.5 mm (20% O&#8322;)</strong></td>
+                  <td>37.4 &rarr; 18.7 fmol/h</td>
+                  <td>10.8% (Day 42)</td>
+                  <td>74.5% (Core Peak)</td>
+                  <td>1.58&times; (Core Enriched)</td>
+                  <td>0.21&times; (Periphery Ring)</td>
+                  <td>327.5 kPa</td>
+                </tr>
+                <tr>
+                  <td><strong>Chondrocyte-Seeded &Oslash;8&times;4.5 mm</strong></td>
+                  <td>18.7 fmol/h (Const)</td>
+                  <td>11.4% (Day 42)</td>
+                  <td>100.0% (Committed)</td>
+                  <td>0.68&times; (Periphery High)</td>
+                  <td>0.64&times; (Periphery High)</td>
+                  <td>134.0 kPa</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Two Chart.js Canvases: 42-Day Differentiation Trajectory & ECM/Moduli Maturation -->
+          <div class="charts-dual-grid">
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <div>
+                  <div class="chart-card-title">42-Day Phenotype Transition, Viable DNA &amp; Core O&#8322; Trajectory</div>
+                  <div class="chart-card-subtitle">Tracking % Undifferentiated MSC, % Chondrocytes, Viability &amp; \(C_{\text{ox}}(0,0,t)\) over Days 0&ndash;42</div>
+                </div>
+              </div>
+              <div class="chart-container-wrapper">
+                <canvas id="chart-time-differentiation"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <div>
+                  <div class="chart-card-title">42-Day ECM Synthesis &amp; Mechanical Stiffness Maturation</div>
+                  <div class="chart-card-subtitle">Cumulative sGAG (% w/w), Collagen (% w/w), \(E_{\text{eq}}\) (kPa) &amp; \(E_{\text{dyn}}\) (kPa) over Days 0&ndash;42</div>
+                </div>
+              </div>
+              <div class="chart-container-wrapper">
+                <canvas id="chart-time-maturation"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Theory Callout Box for MSC vs Chondrocyte Phenotype -->
+          <div class="theory-callout">
+            <strong>Why MSC-Seeded Hydrogels Behave Differently from Mature Chondrocyte Constructs:</strong>
+            Undifferentiated bone-marrow MSCs exhibit up to \(2\times\) higher baseline oxygen consumption (\(V_{\max} \approx 37.4\text{ fmol/h/cell}\)) than differentiated chondrocytes (\(18.7\text{ fmol/h/cell}\)) and require a lineage-commitment signal. In TGF-\(\beta 3\) media, local physiological hypoxia (\(\sim 2\text{–}12\%\text{ O}_2\)) stabilizes HIF-1\(\alpha\), accelerating MSC differentiation into chondrocytes and upregulating aggrecan/sGAG synthesis in the construct core while lowering metabolic \(V_{\max}\) toward the chondrocytic rate. However, where local \(\text{O}_2\) falls below the critical survival threshold (\(&lt;1\%\text{ O}_2\)), nutrient/oxygen starvation triggers apoptosis (DNA loss) and halts matrix deposition.
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 1: THEORY & PDE DERIVATION (Buckley, Meyer & Kelly 2012)            -->
+  <!-- ========================================================================= -->
+  <div class="modal-backdrop" id="modal-theory">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>&#128214; Theory &amp; PDE Derivation &mdash; Buckley, Meyer &amp; Kelly (2012), Tissue Eng. Part A</h3>
+        <button class="modal-close-btn" data-close="modal-theory">&times;</button>
+      </div>
+      <div class="modal-body">
+
+        <h4>1. Clinical &amp; Bioengineering Motivation: Scaling Up Cartilage Grafts</h4>
+        <p>
+          Bone marrow-derived mesenchymal stem cells (MSCs) encapsulated in 3D hydrogels (such as agarose) are a promising cell source for articular cartilage repair. While most laboratory studies characterize small cylindrical constructs (\(\varnothing 4\text{–}5\text{ mm}\)), clinical defects require scaling up construct thickness and diameter. <strong>Buckley, Meyer, &amp; Kelly (2012)</strong> investigated how construct geometry (\(\varnothing 4\times 1.5\text{ mm}\), \(\varnothing 5\times 3.0\text{ mm}\), \(\varnothing 6\times 4.5\text{ mm}\), and \(\varnothing 8\times 4.5\text{ mm}\)) and external oxygen tension (\(20\%\text{ O}_2\) normoxia vs. \(5\%\text{ O}_2\) hypoxia) govern internal oxygen gradients, spatial extracellular matrix (ECM) architecture, and compressive mechanical properties over 42 days of chondrogenic culture.
+        </p>
+
+        <h4>2. Nonlinear Michaelis&ndash;Menten Reaction&ndash;Diffusion PDE (Eqs. 1&ndash;3)</h4>
+        <p>
+          Oxygen transport within a cylindrical cell-seeded hydrogel of radius \(R = \varnothing/2\) and height \(H\) is governed by the mass-conservation reaction&ndash;diffusion partial differential equation (Eq. 1):
+        </p>
+        <div class="math-display-box">
+          \[\frac{\partial C_{\text{ox}}}{\partial t} = \nabla \cdot \left(D_{\text{construct}} \nabla C_{\text{ox}}\right) - n_{\text{cell}}\,\frac{V_{\max}\,C_{\text{ox}}}{K_m + C_{\text{ox}}}\]
+        </div>
+        <p>
+          In axisymmetric cylindrical coordinates \((r, z)\) at quasi-steady state (\(\partial C_{\text{ox}}/\partial t = 0\)):
+        </p>
+        <div class="math-display-box">
+          \[D_{\text{construct}}\left(\frac{\partial^2 C_{\text{ox}}}{\partial r^2} + \frac{1}{r}\frac{\partial C_{\text{ox}}}{\partial r} + \frac{\partial^2 C_{\text{ox}}}{\partial z^2}\right) = n_{\text{cell}}\,\frac{V_{\max}\,C_{\text{ox}}}{K_m + C_{\text{ox}}}\]
+        </div>
+        <p>
+          The effective diffusivity \(D_{\text{construct}}\) through the agarose hydrogel polymer network of volume fraction \(\phi_f\) (e.g., \(\phi_f = 0.02\) for \(2\%\text{ w/v}\) agarose) is given by the <strong>Mackie and Meares (1955)</strong> obstruction relation (Eq. 2):
+        </p>
+        <div class="math-display-box">
+          \[D_{\text{construct}} = D_{\text{H}_2\text{O}}\,\frac{(1 - \phi_f)^2}{(1 + \phi_f)^2}\]
+        </div>
+        <p>
+          For oxygen in culture medium at \(37^\circ\text{C}\), \(D_{\text{H}_2\text{O}} = 3.0 \times 10^{-9}\text{ m}^2/\text{s}\), yielding \(D_{\text{construct}} = 2.77 \times 10^{-9}\text{ m}^2/\text{s}\) in \(2\%\) agarose. Cellular uptake follows Michaelis&ndash;Menten kinetics with \(K_m = 6.3 \times 10^{-3}\text{ mol/m}^3\) (\(\approx 0.64\%\text{ O}_2\)) and maximum consumption rate \(V_{\max} = 18.7\text{ fmol/h/cell}\) (\(5.19 \times 10^{-18}\text{ mol/s/cell}\)) for differentiated chondrocytes, or up to \(2\times V_{\max} = 37.4\text{ fmol/h/cell}\) for undifferentiated MSCs (Eq. 3).
+        </p>
+
+        <h4>3. Boundary Conditions &amp; The Impermeable Culture Dish Asymmetry (Figs. 1&ndash;3)</h4>
+        <ul style="padding-left:1.5rem; display:flex; flex-direction:column; gap:0.35rem;">
+          <li><strong>Top Surface (\(z = H\)) &amp; Lateral Radial Wall (\(r = R\)):</strong> Exposed to well-mixed culture medium at Dirichlet concentration \(C_{\text{ox}} = C_{\text{ext}}\) (where \(20\%\text{ O}_2 \equiv 0.197\text{ mol/m}^3\) and \(5\%\text{ O}_2 \equiv 0.0493\text{ mol/m}^3\) by Henry's law at \(37^\circ\text{C}\)).</li>
+          <li><strong>Central Symmetry Axis (\(r = 0\)):</strong> Zero radial flux \(\left.\frac{\partial C_{\text{ox}}}{\partial r}\right|_{r=0} = 0\).</li>
+          <li><strong>Bottom Culture Dish Surface (\(z = 0\)):</strong> Resting flat against impermeable tissue culture plastic, enforcing a zero-flux Neumann boundary condition \(\left.\frac{\partial C_{\text{ox}}}{\partial z}\right|_{z=0} = 0\).</li>
+        </ul>
+        <p>
+          Because oxygen cannot enter through the bottom surface (\(z=0\)), the axial profile is asymmetric and the global minimum oxygen concentration always occurs at the <strong>Bottom Core \((r = 0, z = 0)\)</strong>.
+        </p>
+
+        <h4>4. Opposing Spatial Gradients of sGAG and Collagen (Figs. 4&ndash;6 &amp; Table 1)</h4>
+        <p>
+          By coring and bisecting constructs into concentric subregions&mdash;<strong>Top Annulus (TA)</strong>, <strong>Bottom Annulus (BA)</strong>, <strong>Top Core (TC)</strong>, and <strong>Bottom Core (BC)</strong> (plus <strong>Top/Bottom Inner Annulus TIA/BIA</strong> for \(\varnothing 8\times 4.5\text{ mm}\) constructs, Fig. 6D)&mdash;Buckley, Meyer, &amp; Kelly (2012) discovered a striking divergence in matrix synthesis at \(20\%\text{ O}_2\):
+        </p>
+        <ul style="padding-left:1.5rem; display:flex; flex-direction:column; gap:0.35rem;">
+          <li><strong>sGAG Concentrates in the Core (TC &amp; BC):</strong> In \(\varnothing 8\times 4.5\text{ mm}\) constructs at \(20\%\text{ O}_2\), sulfated glycosaminoglycan (Alcian Blue) is significantly higher in the core (\(\text{TC } 1.18 \pm 0.06\%\text{ w/w}\), \(\text{BC } 1.19 \pm 0.01\%\text{ w/w}\)) than the outer annulus (\(\text{TA } 0.62 \pm 0.01\%\text{ w/w}\), \(\text{BA } 0.88 \pm 0.11\%\text{ w/w}\)). Self-induced core hypoxia (\(\sim 10.8\%\text{ O}_2\) at \(1\times V_{\max}\), \(\sim 2.6\%\text{ O}_2\) at \(2\times V_{\max}\)) promotes HIF-1\(\alpha\)/SOX9-driven chondrogenesis and proteoglycan synthesis.</li>
+          <li><strong>Collagen Concentrates in the Periphery (TA &amp; BA):</strong> Total collagen (Picrosirius Red / hydroxyproline) in \(\varnothing 8\times 4.5\text{ mm}\) constructs is dramatically higher in the normoxic annulus (\(\text{TA } 2.79 \pm 0.74\%\text{ w/w}\), \(\text{BA } 2.89 \pm 0.71\%\text{ w/w}\)) than the inner annulus (\(\text{TIA } 0.71 \pm 0.23\%\), \(\text{BIA } 0.44 \pm 0.10\%\)) and core (\(\text{TC } 0.74 \pm 0.13\%\text{ w/w}\), \(\text{BC } 0.46 \pm 0.18\%\text{ w/w}\)), reflecting the molecular \(\text{O}_2\) dependence of enzymatic collagen hydroxylation and cross-linking.</li>
+        </ul>
+
+        <h4>5. Complete Table 1 Subregion &amp; Whole-Construct Experimental Benchmarks (Day 42)</h4>
+        <div class="table-wrapper" style="margin:0.6rem 0 1rem 0;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Construct Scale &amp; O&#8322;</th>
+                <th>Subregion</th>
+                <th>DNA (ng/mg)</th>
+                <th>sGAG (% w/w)</th>
+                <th>sGAG/DNA (&micro;g/&micro;g)</th>
+                <th>Collagen (% w/w)</th>
+                <th>Col/DNA (&micro;g/&micro;g)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="row-total">
+                <td><strong>&Oslash;4.0&times;1.5 mm (20% O&#8322;)</strong><br><span style="font-size:0.72rem; color:var(--color-text-muted);">Core 18.2% &middot; E_eq 23.5 / E_dyn 90.81 kPa</span></td>
+                <td><strong>Total</strong></td>
+                <td>75.39 &pm; 7.19</td>
+                <td>0.14 &pm; 0.00</td>
+                <td>18.72 &pm; 2.03</td>
+                <td>0.31 &pm; 0.01</td>
+                <td>40.80 &pm; 4.98</td>
+              </tr>
+              <tr>
+                <td rowspan="5"><strong>&Oslash;5.0&times;3.0 mm (20% O&#8322;)</strong><br><span style="font-size:0.72rem; color:var(--color-text-muted);">Core 16.3% &middot; E_eq 23.2 / E_dyn 163.0 kPa</span></td>
+                <td>TA</td>
+                <td>73.04 &pm; 10.67</td>
+                <td>0.21 &pm; 0.01</td>
+                <td>28.92 &pm; 3.39</td>
+                <td>0.23 &pm; 0.07</td>
+                <td>31.76 &pm; 5.67</td>
+              </tr>
+              <tr>
+                <td>TC</td>
+                <td>57.87 &pm; 4.01</td>
+                <td>0.58 &pm; 0.03</td>
+                <td>100.33 &pm; 10.48</td>
+                <td>0.77 &pm; 0.08</td>
+                <td>132.62 &pm; 7.91</td>
+              </tr>
+              <tr>
+                <td>BA</td>
+                <td>71.76 &pm; 8.26</td>
+                <td>0.31 &pm; 0.02</td>
+                <td>43.62 &pm; 3.27</td>
+                <td>0.43 &pm; 0.03</td>
+                <td>61.10 &pm; 7.93</td>
+              </tr>
+              <tr>
+                <td>BC</td>
+                <td>48.53 &pm; 5.19</td>
+                <td>1.07 &pm; 0.13</td>
+                <td>223.56 &pm; 39.06</td>
+                <td>1.00 &pm; 0.08</td>
+                <td>208.30 &pm; 7.50</td>
+              </tr>
+              <tr class="row-total">
+                <td><strong>Total</strong></td>
+                <td>64.80 &pm; 2.10</td>
+                <td>0.51 &pm; 0.03</td>
+                <td>79.5</td>
+                <td>0.56 &pm; 0.04</td>
+                <td>87.0</td>
+              </tr>
+              <tr>
+                <td rowspan="5"><strong>&Oslash;5.0&times;3.0 mm (5% O&#8322;)</strong><br><span style="font-size:0.72rem; color:var(--color-text-muted);">Core 1.9% &middot; E_eq 33.0 / E_dyn 310.0 kPa</span></td>
+                <td>TA</td>
+                <td>67.50 &pm; 3.32</td>
+                <td>0.98 &pm; 0.10</td>
+                <td>144.13 &pm; 7.62</td>
+                <td>2.73 &pm; 0.41</td>
+                <td>406.72 &pm; 72.02</td>
+              </tr>
+              <tr>
+                <td>TC</td>
+                <td>69.06 &pm; 9.82</td>
+                <td>1.31 &pm; 0.15</td>
+                <td>190.05 &pm; 7.23</td>
+                <td>1.92 &pm; 0.68</td>
+                <td>276.27 &pm; 86.47</td>
+              </tr>
+              <tr>
+                <td>BA</td>
+                <td>63.51 &pm; 9.24</td>
+                <td>1.06 &pm; 0.09</td>
+                <td>168.69 &pm; 21.36</td>
+                <td>2.11 &pm; 0.27</td>
+                <td>337.42 &pm; 63.62</td>
+              </tr>
+              <tr>
+                <td>BC</td>
+                <td>43.91 &pm; 14.06</td>
+                <td>1.36 &pm; 0.16</td>
+                <td>322.75 &pm; 63.92</td>
+                <td>1.88 &pm; 0.37</td>
+                <td>466.25 &pm; 182.04</td>
+              </tr>
+              <tr class="row-total">
+                <td><strong>Total</strong></td>
+                <td>61.80 &pm; 7.50</td>
+                <td>1.16 &pm; 0.10</td>
+                <td>190.0</td>
+                <td>2.22 &pm; 0.25</td>
+                <td>368.0</td>
+              </tr>
+              <tr>
+                <td rowspan="5"><strong>&Oslash;6.0&times;4.5 mm (20% O&#8322;)</strong><br><span style="font-size:0.72rem; color:var(--color-text-muted);">Core 14.3% &middot; E_eq 26.8 / E_dyn 215.0 kPa</span></td>
+                <td>TA</td>
+                <td>61.48 &pm; 3.93</td>
+                <td>0.32 &pm; 0.02</td>
+                <td>52.25 &pm; 2.41</td>
+                <td>0.60 &pm; 0.16</td>
+                <td>97.51 &pm; 22.07</td>
+              </tr>
+              <tr>
+                <td>TC</td>
+                <td>71.67 &pm; 5.63</td>
+                <td>0.97 &pm; 0.03</td>
+                <td>204.69 &pm; 13.72</td>
+                <td>1.43 &pm; 0.02</td>
+                <td>300.42 &pm; 18.94</td>
+              </tr>
+              <tr>
+                <td>BA</td>
+                <td>68.53 &pm; 6.12</td>
+                <td>0.44 &pm; 0.02</td>
+                <td>64.96 &pm; 8.25</td>
+                <td>0.89 &pm; 0.56</td>
+                <td>127.74 &pm; 70.76</td>
+              </tr>
+              <tr>
+                <td>BC</td>
+                <td>47.49 &pm; 3.12</td>
+                <td>1.34 &pm; 0.07</td>
+                <td>188.56 &pm; 19.62</td>
+                <td>1.17 &pm; 0.19</td>
+                <td>163.32 &pm; 14.24</td>
+              </tr>
+              <tr class="row-total">
+                <td><strong>Total</strong></td>
+                <td>62.50 &pm; 2.20</td>
+                <td>0.75 &pm; 0.03</td>
+                <td>120.0</td>
+                <td>1.01 &pm; 0.19</td>
+                <td>161.5</td>
+              </tr>
+              <tr>
+                <td rowspan="5"><strong>&Oslash;6.0&times;4.5 mm (5% O&#8322;)</strong><br><span style="font-size:0.72rem; color:var(--color-text-muted);">Core 0.7% &middot; E_eq 38.5 / E_dyn 335.0 kPa</span></td>
+                <td>TA</td>
+                <td>45.61 &pm; 4.11</td>
+                <td>1.06 &pm; 0.05</td>
+                <td>232.36 &pm; 22.09</td>
+                <td>0.41 &pm; 0.14</td>
+                <td>92.36 &pm; 38.12</td>
+              </tr>
+              <tr>
+                <td>TC</td>
+                <td>65.52 &pm; 8.35</td>
+                <td>1.40 &pm; 0.05</td>
+                <td>217.04 &pm; 32.82</td>
+                <td>0.88 &pm; 0.12</td>
+                <td>136.46 &pm; 27.43</td>
+              </tr>
+              <tr>
+                <td>BA</td>
+                <td>57.71 &pm; 6.08</td>
+                <td>1.06 &pm; 0.02</td>
+                <td>185.97 &pm; 18.73</td>
+                <td>0.60 &pm; 0.03</td>
+                <td>103.78 &pm; 6.07</td>
+              </tr>
+              <tr>
+                <td>BC</td>
+                <td>36.79 &pm; 12.86</td>
+                <td>1.35 &pm; 0.04</td>
+                <td>400.44 &pm; 138.74</td>
+                <td>0.99 &pm; 0.17</td>
+                <td>285.60 &pm; 88.53</td>
+              </tr>
+              <tr class="row-total">
+                <td><strong>Total</strong></td>
+                <td>51.80 &pm; 1.50</td>
+                <td>1.21 &pm; 0.06</td>
+                <td>233.0</td>
+                <td>0.69 &pm; 0.10</td>
+                <td>134.0</td>
+              </tr>
+              <tr>
+                <td rowspan="7"><strong>&Oslash;8.0&times;4.5 mm (20% O&#8322;)</strong><br><span style="font-size:0.72rem; color:var(--color-text-muted);">Core 10.8% &middot; E_eq 36.52 / E_dyn 327.51 kPa</span></td>
+                <td>TA</td>
+                <td>83.24 &pm; 6.65</td>
+                <td>0.62 &pm; 0.01</td>
+                <td>74.15 &pm; 6.91</td>
+                <td>2.79 &pm; 0.74</td>
+                <td>332.04 &pm; 62.58</td>
+              </tr>
+              <tr>
+                <td>TIA</td>
+                <td>45.46 &pm; 13.80</td>
+                <td>0.76 &pm; 0.09</td>
+                <td>173.04 &pm; 33.80</td>
+                <td>0.71 &pm; 0.23</td>
+                <td>156.95 &pm; 24.87</td>
+              </tr>
+              <tr>
+                <td>TC</td>
+                <td>53.17 &pm; 18.09</td>
+                <td>1.18 &pm; 0.06</td>
+                <td>236.63 &pm; 65.68</td>
+                <td>0.74 &pm; 0.13</td>
+                <td>146.00 &pm; 42.41</td>
+              </tr>
+              <tr>
+                <td>BA</td>
+                <td>64.28 &pm; 21.05</td>
+                <td>0.88 &pm; 0.11</td>
+                <td>72.27 &pm; 18.77</td>
+                <td>2.89 &pm; 0.71</td>
+                <td>487.72 &pm; 191.07</td>
+              </tr>
+              <tr>
+                <td>BIA</td>
+                <td>21.87 &pm; 0.63</td>
+                <td>0.86 &pm; 0.03</td>
+                <td>391.80 &pm; 2.68</td>
+                <td>0.44 &pm; 0.10</td>
+                <td>202.45 &pm; 48.47</td>
+              </tr>
+              <tr>
+                <td>BC</td>
+                <td>33.26 &pm; 10.78</td>
+                <td>1.19 &pm; 0.01</td>
+                <td>389.07 &pm; 150.81</td>
+                <td>0.46 &pm; 0.18</td>
+                <td>190.39 &pm; 72.11</td>
+              </tr>
+              <tr class="row-total">
+                <td><strong>Total</strong></td>
+                <td>48.20 &pm; 5.50</td>
+                <td>0.88 &pm; 0.04</td>
+                <td>185.0</td>
+                <td>1.62 &pm; 0.17</td>
+                <td>262.0</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h4>6. Biomechanical Structure&ndash;Function Relationships (Fig. 7A&ndash;G)</h4>
+        <p>
+          Unconfined compression testing (10% ramp-and-hold stress relaxation for \(E_{\text{eq}}\), followed by 1% cyclic strain at \(1\text{ Hz}\) for \(E_{\text{dyn}}\)) demonstrated that bulk compressive stiffness correlates positively with both total sGAG (\(r^2 = 0.61\text{–}0.65\)) and total collagen content (\(r^2 = 0.65\text{–}0.72\)). At \(20\%\text{ O}_2\), scaling up from \(\varnothing 4\times 1.5\text{ mm}\) to \(\varnothing 8\times 4.5\text{ mm}\) lowers internal core oxygen (\(18.2\% \to 10.8\%\)), which stimulates MSC chondrogenesis and increases whole-construct sGAG (\(0.14\% \to 0.88\%\text{ w/w}\)), collagen (\(0.31\% \to 1.62\%\text{ w/w}\)), \(E_{\text{eq}}\) (\(23.5 \to 36.52\text{ kPa}\)), and \(E_{\text{dyn}}\) (\(90.81 \to 327.51\text{ kPa}\)). Culturing \(\varnothing 5\times 3.0\text{ mm}\) constructs at \(5\%\text{ O}_2\) (\(\text{Core O}_2 = 1.9\%\)) produces a <strong>1.9-fold increase in \(E_{\text{dyn}}\)</strong> (\(163.0 \to 310.0\text{ kPa}\)) and boosts \(E_{\text{eq}}\) (\(23.2 \to 33.0\text{ kPa}\)), whereas scaling to \(\varnothing 6\times 4.5\text{ mm}\) at \(5\%\text{ O}_2\) (\(\text{Core O}_2 = 0.7\%\)) reduces viable DNA (\(62.50 \to 51.80\text{ ng/mg}\)) and suppresses collagen accumulation (\(2.22\% \to 0.69\%\text{ w/w}\)).
+        </p>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 2: INTERACTIVE PRACTICE QUIZ (BME 5313 / 6303)                      -->
+  <!-- ========================================================================= -->
+  <div class="modal-backdrop" id="modal-quiz">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>&#9997;&#65039; Practice Quiz: Construct Scale, Oxygen Transport &amp; MSC Chondrogenesis</h3>
+        <button class="modal-close-btn" data-close="modal-quiz">&times;</button>
+      </div>
+      <div class="modal-body" id="quiz-container">
+        <!-- Dynamically populated by app.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- SITE FOOTER                                                               -->
+  <!-- ========================================================================= -->
+  <footer class="site-footer">
+    <p>
+      &copy; 2026 Lawrence Technological University &middot; Experimental Biomechanics Laboratory (EBL) &middot; Dr. Eric G. Meyer<br>
+      Developed for <strong>BME 5313 / 6303: Cellular Mechanobiology</strong> &middot; Reference: Buckley, C.T., Meyer, E.G., &amp; Kelly, D.J. (2012). <em>Tissue Engineering Part A</em>, 18(3-4), 382&ndash;396.
+    </p>
+  </footer>
+
+  <!-- Main Application Script (ES Module) -->
+  <script type="module" src="app.js"></script>
+
+</body>
+</html>
